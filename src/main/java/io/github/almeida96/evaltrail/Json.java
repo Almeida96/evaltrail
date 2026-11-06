@@ -34,6 +34,7 @@ final class Json {
     static JsonNode parse(byte[] bytes) throws IOException {
         JsonNode node = MAPPER.readTree(bytes);
         require(node != null && !node.isMissingNode(), "JSON document is empty");
+        validateUnicode(node);
         return node;
     }
 
@@ -86,7 +87,25 @@ final class Json {
         return MAPPER.getNodeFactory().textNode(value).toString();
     }
 
-    static String digest(JsonNode node) { return hash(canonical(node)); }
+    static String digest(JsonNode node) {
+        // UTF-8 replaces lone surrogates with '?', which would collapse distinct case inputs.
+        // Check programmatically constructed trees as well as parsed JSON.
+        validateUnicode(node);
+        return hash(canonical(node));
+    }
+    private static void validateUnicode(JsonNode node) {
+        if (node.isTextual()) validateUnicodeText(node.textValue());
+        if (node.isObject()) node.fieldNames().forEachRemaining(Json::validateUnicodeText);
+        if (node.isContainerNode()) node.forEach(Json::validateUnicode);
+    }
+    private static void validateUnicodeText(String text) {
+        for (int index = 0; index < text.length(); index++) {
+            char value = text.charAt(index);
+            if (Character.isHighSurrogate(value)) {
+                require(++index < text.length() && Character.isLowSurrogate(text.charAt(index)), "Unpaired Unicode surrogate");
+            } else require(!Character.isLowSurrogate(value), "Unpaired Unicode surrogate");
+        }
+    }
     static String hash(String value) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(UTF_8))); }
         catch (NoSuchAlgorithmException exception) { throw new IllegalStateException("SHA-256 is unavailable", exception); }

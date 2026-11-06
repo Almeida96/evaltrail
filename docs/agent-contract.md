@@ -53,6 +53,8 @@ Return empty arrays when no tools or citations were used. Do not omit them or re
 
 Unknown envelope, tool, citation, or usage fields are rejected. Keep provider-specific metadata in your own trace store. The `output` and `arguments` values can contain arbitrary fields. Duplicate JSON object keys, trailing content, and numeric strings where integers are required are invalid.
 
+Strings and object keys must contain valid Unicode scalar values. Escaped unpaired surrogates are rejected in suites and observations before fingerprinting or grading: replacing them during UTF-8 encoding could otherwise make distinct case inputs share a digest. Valid supplementary characters, including emoji, are accepted, and valid existing fingerprints are unchanged.
+
 ## Instrument the application
 
 1. Create an isolated session for each request. Inputs may run concurrently.
